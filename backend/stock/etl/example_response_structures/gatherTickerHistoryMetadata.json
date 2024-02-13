@@ -1,0 +1,51 @@
+{
+    "historyMetaData": {
+        "currency": "USD",
+        "symbol": "MSFT",
+        "exchangeName": "NMS",
+        "instrumentType": "EQUITY",
+        "firstTradeDate": 511108200,
+        "regularMarketTime": 1707512401,
+        "gmtoffset": -18000,
+        "timezone": "EST",
+        "exchangeTimezoneName": "America/New_York",
+        "regularMarketPrice": 420.55,
+        "chartPreviousClose": 375.79,
+        "priceHint": 2,
+        "currentTradingPeriod": {
+            "pre": {
+                "timezone": "EST",
+                "start": 1707469200,
+                "end": 1707489000,
+                "gmtoffset": -18000
+            },
+            "regular": {
+                "timezone": "EST",
+                "start": 1707489000,
+                "end": 1707512400,
+                "gmtoffset": -18000
+            },
+            "post": {
+                "timezone": "EST",
+                "start": 1707512400,
+                "end": 1707526800,
+                "gmtoffset": -18000
+            }
+        },
+        "dataGranularity": "1d",
+        "range": "1mo",
+        "validRanges": [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "2y",
+            "5y",
+            "10y",
+            "ytd",
+            "max"
+        ]
+    }
+}

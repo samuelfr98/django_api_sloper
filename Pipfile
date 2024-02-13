@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+django = "*"
+djangorestframework = "*"
+django-cors-headers = "*"
+pandas-datareader = "*"
+yfinance = "*"
+scikit-learn = "*"
+keras = "*"
+matplotlib = "*"
+tensorflow = "*"
+ta-lib = "*"
+
+[dev-packages]
+ipykernel = "*"
+
+[requires]
+python_version = "3.10"
