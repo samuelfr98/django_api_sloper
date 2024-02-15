@@ -149,6 +149,7 @@ class YFinanceResponse:
             ticker_history = ticker_object.tickers[stock].history if ticker_count > 1 else ticker_object.history
             ticker_history_metadata = ticker_object.tickers[stock].history_metadata if ticker_count > 1 else ticker_object.history_metadata
 
+
             # Formatting quote object
             symbol = ticker_info['symbol']
             currency = ticker_info['currency']
@@ -156,8 +157,6 @@ class YFinanceResponse:
             fullExchangeName = ticker_info['longName']
             displayName = ticker_info['shortName']
             regularMarketPrice = ticker_info['currentPrice']
-            # regularMarketChange = ticker_info['']
-            # regularMarketChangePercent = ticker_info['']
             regularMarketPreviousClose = ticker_info['regularMarketPreviousClose']
             regularMarketTime = ticker_history_metadata['regularMarketTime']
             # postMarketPrice = ticker_info['']
@@ -174,12 +173,19 @@ class YFinanceResponse:
             trailingAnnualDividendYield = ticker_info['trailingAnnualDividendYield']
             trailingEps = ticker_info['trailingEps']
             
+            regularMarketChange = regularMarketPrice - regularMarketOpen
+            regularMarketChangePercent = (regularMarketChange/regularMarketOpen)*100
+            regularMarketChangePreviousClose = regularMarketPrice - regularMarketPreviousClose
+            
             quote = {
                 'symbol': symbol,
                 'currency': currency,
                 'fullExchangeName': fullExchangeName,
                 'displayName': displayName,
                 'regularMarketPrice': regularMarketPrice,
+                'regularMarketChange': regularMarketChange,
+                'regularMarketChangePercent': regularMarketChangePercent,
+                'regularMarketChangePreviousClose': regularMarketChangePreviousClose,
                 'regularMarketPreviousClose': regularMarketPreviousClose,
                 # 'regularMarketTime': regularMarketTime, ## epoch time
                 'regularMarketTime': datetime.utcfromtimestamp(regularMarketTime).isoformat(), ## iso time
