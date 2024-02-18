@@ -140,15 +140,17 @@ class YFinanceResponse:
             
         # No args
         else:
+            print("We have no args!")
             return
         
         quotes = []
+        
+        print("We got the ticker shit")
                 
         for stock in stock_symbols_array:
             ticker_info = ticker_object.tickers[stock].info if ticker_count > 1 else ticker_object.info
-            ticker_history = ticker_object.tickers[stock].history if ticker_count > 1 else ticker_object.history
+            ticker_history = ticker_object.tickers[stock].history(interval="1d", period="1d") if ticker_count > 1 else ticker_object.history(interval="1d", period="1d")
             ticker_history_metadata = ticker_object.tickers[stock].history_metadata if ticker_count > 1 else ticker_object.history_metadata
-
 
             # Formatting quote object
             symbol = ticker_info['symbol']
@@ -170,10 +172,9 @@ class YFinanceResponse:
             fiftyTwoWeekLow = ticker_info['fiftyTwoWeekLow']
             fiftyTwoWeekHigh = ticker_info['fiftyTwoWeekHigh']
             averageVolume = ticker_info['averageVolume']
-            trailingAnnualDividendYield = ticker_info['trailingAnnualDividendYield']
+            trailingAnnualDividendYield = ticker_info['trailingAnnualDividendYield'] if 'trailingAnnualDividendYield' in ticker_info.keys() else None
             trailingEps = ticker_info['trailingEps']
-            
-            regularMarketChange = regularMarketPrice - regularMarketOpen
+            regularMarketChange = regularMarketPrice - regularMarketPreviousClose
             regularMarketChangePercent = (regularMarketChange/regularMarketOpen)*100
             regularMarketChangePreviousClose = regularMarketPrice - regularMarketPreviousClose
             
@@ -241,7 +242,7 @@ class YFinanceResponse:
                 
         for stock in stock_symbols_array:
             ticker_info = ticker_object.tickers[stock].info if ticker_count > 1 else ticker_object.info
-            ticker_history = ticker_object.tickers[stock].history if ticker_count > 1 else ticker_object.history
+            ticker_history = ticker_object.tickers[stock].history(interval="1d", period="1d") if ticker_count > 1 else ticker_object.history(interval="1d", period="1d")
             ticker_history_metadata = ticker_object.tickers[stock].history_metadata if ticker_count > 1 else ticker_object.history_metadata
 
             # Formatting ticker object
