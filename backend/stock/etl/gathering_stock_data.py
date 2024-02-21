@@ -4,6 +4,7 @@ import json
 import math
 import re
 import sys
+import dateutil.parser as dp
 from django.http import JsonResponse
 import pandas_datareader.data as web
 import numpy as np
@@ -146,17 +147,20 @@ class YFinanceResponse:
         quotes = []
         
         print("We got the ticker shit")
+
                 
+        ##   Add in beta and yield!
         for stock in stock_symbols_array:
             ticker_info = ticker_object.tickers[stock].info if ticker_count > 1 else ticker_object.info
             ticker_history = ticker_object.tickers[stock].history(interval="1d", period="1d") if ticker_count > 1 else ticker_object.history(interval="1d", period="1d")
-            ticker_history_metadata = ticker_object.tickers[stock].history_metadata if ticker_count > 1 else ticker_object.history_metadata
+            ticker_history_metadata = ticker_object.tickers[stock].history_metadata if ticker_count > 1 else ticker_object.history_metadata            
 
+            print(ticker_info)
             # Formatting quote object
             symbol = ticker_info['symbol']
             currency = ticker_info['currency']
             # marketState = ticker_info['']
-            fullExchangeName = ticker_info['longName']
+            fullExchangeName = ticker_info['exchange']
             displayName = ticker_info['shortName']
             regularMarketPrice = ticker_info['currentPrice']
             regularMarketPreviousClose = ticker_info['regularMarketPreviousClose']
@@ -188,8 +192,8 @@ class YFinanceResponse:
                 'regularMarketChangePercent': regularMarketChangePercent,
                 'regularMarketChangePreviousClose': regularMarketChangePreviousClose,
                 'regularMarketPreviousClose': regularMarketPreviousClose,
-                # 'regularMarketTime': regularMarketTime, ## epoch time
-                'regularMarketTime': datetime.utcfromtimestamp(regularMarketTime).isoformat(), ## iso time
+                'regularMarketTime': regularMarketTime, ## epoch time
+                # 'regularMarketTime': datetime.utcfromtimestamp(regularMarketTime).isoformat(), ## iso time
                 'regularMarketOpen': regularMarketOpen,
                 'regularMarketDayHigh': regularMarketDayHigh,
                 'regularMarketDayLow': regularMarketDayLow,
@@ -281,8 +285,6 @@ class YFinanceResponse:
         ticker_info = ticker_object.info
         ticker_history_metadata = ticker_object.history_metadata
         
-        print(ticker_history)
-
         # Formatting chartMeta fields
         currency = ticker_info['currency']
         symbol = ticker_info['symbol']
@@ -291,18 +293,6 @@ class YFinanceResponse:
         gmtOffSetMilliseconds = ticker_info['gmtOffSetMilliseconds']
         regularTradingPeriodStartDate = ticker_history_metadata['currentTradingPeriod']['regular']['start']
         regularTradingPeriodEndDate = ticker_history_metadata['currentTradingPeriod']['regular']['end']
-        
-        
-        # Formatting indicator values
-        ticker_history_dict = ticker_history.reset_index().to_dict(orient='records')
-
-        indicator = {
-            # public let timestamp: Date
-            # public let open: Double
-            # public let high: Double
-            # public let low: Double
-            # public let close
-        }
 
         chartMeta = {
             'currency': currency,
@@ -310,11 +300,35 @@ class YFinanceResponse:
             'regularMarketPrice': regularMarketPrice,
             'previousClose': previousClose,
             'gmtOffSetMilliseconds': gmtOffSetMilliseconds,
-            # 'regularTradingPeriodStartDate': regularTradingPeriodStartDate, ## epoch
-            'regularTradingPeriodStartDate': datetime.utcfromtimestamp(regularTradingPeriodStartDate).isoformat(), ## iso
-            # 'regularTradingPeriodEndDate': regularTradingPeriodEndDate,     ## epoch      
-            'regularTradingPeriodEndDate': datetime.utcfromtimestamp(regularTradingPeriodEndDate).isoformat(),     ## iso      
+            'regularTradingPeriodStartDate': regularTradingPeriodStartDate, ## convert to epoch
+            # 'regularTradingPeriodStartDate': datetime.utcfromtimestamp(regularTradingPeriodStartDate).isoformat(), ## iso
+            'regularTradingPeriodEndDate': regularTradingPeriodEndDate,     ## convert to epoch      
+            # 'regularTradingPeriodEndDate': datetime.utcfromtimestamp(regularTradingPeriodEndDate).isoformat(),     ## iso      
         }
+                
+        # Formatting indicator values
+        ticker_history_df = ticker_history.reset_index()
+        
+        indicator = {
+            # public let timestamp: Date?
+            # public let timestamp: Date?
+            # public let open: Double
+            # public let high: Double
+            # public let low: Double
+            # public let close
+        }
+        # Date or Datetime key is used depending on period and interval inputs. Standardize to always output as date key.
+        if 'Datetime' in ticker_history_df: 
+            ticker_history_df = ticker_history_df.rename(columns={'Datetime': 'Date'})
+        
+        
+        # Convert indicator Date to epoch time. Key name changes based on interval. Intraday interval -> Datetime. Period >= 1d -> Date
+        # "Date":     "2024-02-20T00:00:00-05:00"
+        # "Datetime": "2024-02-20T09:30:00-05:00"
+
+        ticker_history_df['Date'] = ticker_history_df['Date'].apply(lambda item: int(item.timestamp()))
+        
+        ticker_history_dict = ticker_history_df.to_dict(orient='records')
 
         chartResponse = {
             'meta': chartMeta,
@@ -322,6 +336,7 @@ class YFinanceResponse:
         }
         
         output = {"chartResponse": chartResponse}
+        # print(output)
     
         return output
 
