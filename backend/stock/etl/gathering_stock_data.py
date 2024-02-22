@@ -149,7 +149,6 @@ class YFinanceResponse:
         print("We got the ticker shit")
 
                 
-        ##   Add in beta and yield!
         for stock in stock_symbols_array:
             ticker_info = ticker_object.tickers[stock].info if ticker_count > 1 else ticker_object.info
             ticker_history = ticker_object.tickers[stock].history(interval="1d", period="1d") if ticker_count > 1 else ticker_object.history(interval="1d", period="1d")
@@ -181,6 +180,8 @@ class YFinanceResponse:
             regularMarketChange = regularMarketPrice - regularMarketPreviousClose
             regularMarketChangePercent = (regularMarketChange/regularMarketOpen)*100
             regularMarketChangePreviousClose = regularMarketPrice - regularMarketPreviousClose
+            beta = ticker_info['beta']
+            yield_var = ticker_info ['dividendYield']
             
             quote = {
                 'symbol': symbol,
@@ -205,6 +206,8 @@ class YFinanceResponse:
                 'averageVolume': averageVolume,
                 'trailingAnnualDividendYield': trailingAnnualDividendYield,
                 'trailingEps': trailingEps,
+                'beta': beta,
+                'yield': yield_var
             }
 
             quotes.append(quote)
