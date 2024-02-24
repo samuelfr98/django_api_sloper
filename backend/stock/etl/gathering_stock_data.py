@@ -4,6 +4,7 @@ import json
 import math
 import re
 import sys
+import time
 import dateutil.parser as dp
 from django.http import JsonResponse
 import pandas_datareader.data as web
@@ -14,94 +15,15 @@ import yfinance as yf
 from ..models import PastStockMetric
 from django.db.models import Q
 from urllib.error import HTTPError
+import talib
+from talib import stream
+talib.set_compatibility(1)
 
 
 class YFinanceResponse:
     yf.pdr_override()
     
-    def gather_all_ticker_info(tickers):   
-        # Cleanse extra whitespaces
-        tickers_array = tickers.split(' ')
-        pattern = re.compile(r'\s+')
-        handle_whitespaces = lambda x: re.sub(pattern, '', x)
-        stock_symbols_array = list(filter(lambda x: x != '', map(handle_whitespaces, tickers_array)))        
-        ticker_count = len(stock_symbols_array)
-        tickers = ' '.join(stock_symbols_array)        
-        
-        output = None
-        
-        # Fetch multiple tickers at once
-        if ticker_count > 1:
-            print("Gathering all ticker info for the following input tickers: ", tickers)
-            ticker_objects = yf.Tickers(tickers)
-            all_results = []
-            for stock in stock_symbols_array:
-                all_results.append(ticker_objects.tickers[stock].info)
-            output = {"results": all_results}
-            
-        # Fetch one ticker only
-        elif ticker_count == 1:
-            print("Gathering all ticker info for the following input ticker: ", tickers)
-            ticker_object = yf.Ticker(tickers)
-            result = ticker_object.info
-            output = {"results": result}
-            
-        # No args
-        else:
-            output = {"error": f"Malformed input ticker(s). Length of inputs is parsed as {ticker_count}."}
-            
-        print(output)
-        return output
-    
-    def gather_ticker_history(ticker, period, interval):
-        print("Gathering ticker history for the following input ticker: ", ticker)
-        
-        output = None
-        
-        if ' ' in ticker:
-            output = {"error": "Malformed input ticker(s). Length of inputs is parsed as ${ticker_count}."}
-            return output
-        
-        ticker_info = yf.Ticker(ticker)
-        ticker_history = ticker_info.history(period=period, interval=interval, prepost=True)
-        ticker_history_json = ticker_history.reset_index().to_dict(orient='records')
-        output = {"history": ticker_history_json}
-        
-        print(output)
-        return output
-
-    def gather_ticker_history_metadata(ticker, period, interval):
-        print("Gathering ticker history metadata for the following input ticker: ", ticker)
-        output = None
-        
-        if ' ' in ticker:
-            output = {"error": "Malformed input ticker(s). Length of inputs is parsed as ${ticker_count}."}
-            return output
-        
-        ticker_info = yf.Ticker(ticker)
-        ticker_history = ticker_info.history(period=period, interval=interval, prepost=True)
-        ticker_history_metadata = ticker_info.history_metadata
-        ticker_history_metadata_json = ticker_history_metadata
-        output = {"historyMetaData": ticker_history_metadata_json}
-        
-        print(output)
-        return output
-    
-    def gather_ticker_history_include_adjusted_close(ticker, startDate=None, endDate=None):
-        print("Gathering ticker history including adjusted close for the following input ticker: ", ticker)
-        output = None
-                
-        ticker_object = web.get_data_yahoo(ticker, start=startDate, end=endDate)
-        
-        print(ticker_object)
-        
-        ticker_info_json = ticker_object.reset_index().to_dict(orient="records")
-        output = {"historyWithAdjustedClose": ticker_info_json}
-        
-        print(output)
-        return output
-    
-    def gather_ticker_news(ticker):
+    def get_ticker_news(ticker):
         print("Gathering ticker news for the following input ticker: ", ticker)
         output = None
         
@@ -116,7 +38,6 @@ class YFinanceResponse:
         print(output)
         return output
     
-    # Specifically for Swift Backend calls. Will likely be cached in this format.
     def get_quote(ticker):
         # Cleanse extra whitespaces
         tickers_array = ticker.split(' ')
@@ -154,34 +75,33 @@ class YFinanceResponse:
             ticker_history = ticker_object.tickers[stock].history(interval="1d", period="1d") if ticker_count > 1 else ticker_object.history(interval="1d", period="1d")
             ticker_history_metadata = ticker_object.tickers[stock].history_metadata if ticker_count > 1 else ticker_object.history_metadata            
 
-            print(ticker_info)
             # Formatting quote object
-            symbol = ticker_info['symbol']
-            currency = ticker_info['currency']
+            symbol = ticker_info['symbol']  if 'symbol' in ticker_info.keys() else None
+            currency = ticker_info['currency']  if 'currency' in ticker_info.keys() else None
             # marketState = ticker_info['']
-            fullExchangeName = ticker_info['exchange']
-            displayName = ticker_info['shortName']
-            regularMarketPrice = ticker_info['currentPrice']
-            regularMarketPreviousClose = ticker_info['regularMarketPreviousClose']
-            regularMarketTime = ticker_history_metadata['regularMarketTime']
+            fullExchangeName = ticker_info['exchange']  if 'exchange' in ticker_info.keys() else None
+            displayName = ticker_info['shortName']  if 'shortName' in ticker_info.keys() else None
+            regularMarketPrice = ticker_info['currentPrice']  if 'currentPrice' in ticker_info.keys() else None
+            regularMarketPreviousClose = ticker_info['regularMarketPreviousClose']  if 'regularMarketPreviousClose' in ticker_info.keys() else None
+            regularMarketTime = ticker_history_metadata['regularMarketTime']  if 'regularMarketTime' in ticker_info.keys() else None
             # postMarketPrice = ticker_info['']
             # postMarketChange = ticker_info['']
-            regularMarketOpen = ticker_info['regularMarketOpen']
-            regularMarketDayHigh = ticker_info['regularMarketDayHigh']
-            regularMarketDayLow = ticker_info['regularMarketDayLow']
-            regularMarketVolume = ticker_info['regularMarketVolume']
-            trailingPE = ticker_info['trailingPE']
-            marketCap = ticker_info['marketCap']
-            fiftyTwoWeekLow = ticker_info['fiftyTwoWeekLow']
-            fiftyTwoWeekHigh = ticker_info['fiftyTwoWeekHigh']
-            averageVolume = ticker_info['averageVolume']
+            regularMarketOpen = ticker_info['regularMarketOpen']  if 'regularMarketOpen' in ticker_info.keys() else None
+            regularMarketDayHigh = ticker_info['regularMarketDayHigh']  if 'regularMarketDayHigh' in ticker_info.keys() else None
+            regularMarketDayLow = ticker_info['regularMarketDayLow']  if 'regularMarketDayLow' in ticker_info.keys() else None
+            regularMarketVolume = ticker_info['regularMarketVolume']  if 'regularMarketVolume' in ticker_info.keys() else None
+            trailingPE = ticker_info['trailingPE']  if 'trailingPE' in ticker_info.keys() else None
+            marketCap = ticker_info['marketCap']  if 'marketCap' in ticker_info.keys() else None
+            fiftyTwoWeekLow = ticker_info['fiftyTwoWeekLow']  if 'fiftyTwoWeekLow' in ticker_info.keys() else None
+            fiftyTwoWeekHigh = ticker_info['fiftyTwoWeekHigh']  if 'fiftyTwoWeekHigh' in ticker_info.keys() else None
+            averageVolume = ticker_info['averageVolume']  if 'averageVolume' in ticker_info.keys() else None
             trailingAnnualDividendYield = ticker_info['trailingAnnualDividendYield'] if 'trailingAnnualDividendYield' in ticker_info.keys() else None
-            trailingEps = ticker_info['trailingEps']
+            trailingEps = ticker_info['trailingEps']  if 'trailingEps' in ticker_info.keys() else None
             regularMarketChange = regularMarketPrice - regularMarketPreviousClose
             regularMarketChangePercent = (regularMarketChange/regularMarketOpen)*100
             regularMarketChangePreviousClose = regularMarketPrice - regularMarketPreviousClose
-            beta = ticker_info['beta']
-            yield_var = ticker_info ['dividendYield']
+            beta = ticker_info['beta']  if 'beta' in ticker_info.keys() else None
+            yield_var = ticker_info ['dividendYield']  if 'dividendYield' in ticker_info.keys() else None
             
             quote = {
                 'symbol': symbol,
@@ -214,8 +134,6 @@ class YFinanceResponse:
         
 
         output = {"quote": quotes}
-
-        print(output)
     
         return output
 
@@ -312,22 +230,21 @@ class YFinanceResponse:
         # Formatting indicator values
         ticker_history_df = ticker_history.reset_index()
         
-        indicator = {
-            # public let timestamp: Date?
-            # public let timestamp: Date?
-            # public let open: Double
-            # public let high: Double
-            # public let low: Double
-            # public let close
-        }
+        # indicator = {
+        #     # public let datetime: Date?
+        #     # public let date: Date?
+        #     # public let open: Double
+        #     # public let high: Double
+        #     # public let low: Double
+        #     # public let close
+        # }
         # Date or Datetime key is used depending on period and interval inputs. Standardize to always output as date key.
         if 'Datetime' in ticker_history_df: 
             ticker_history_df = ticker_history_df.rename(columns={'Datetime': 'Date'})
         
         
-        # Convert indicator Date to epoch time. Key name changes based on interval. Intraday interval -> Datetime. Period >= 1d -> Date
+        # Convert indicator Date to epoch time
         # "Date":     "2024-02-20T00:00:00-05:00"
-        # "Datetime": "2024-02-20T09:30:00-05:00"
 
         ticker_history_df['Date'] = ticker_history_df['Date'].apply(lambda item: int(item.timestamp()))
         
@@ -343,21 +260,199 @@ class YFinanceResponse:
     
         return output
 
+    def get_recommended_strategy(ticker):
+        yf.pdr_override()
+        
+        ticker_object = yf.Ticker(ticker)
+        ticker_info = ticker_object.info
+        
+        # From info
+        overallRisk = ticker_info['overallRisk'] if 'overallRisk' in ticker_info.keys() else None
+        recommendationKey = ticker_info['recommendationKey'] if 'recommendationKey' in ticker_info.keys() else None
+        recommendationMean = ticker_info['recommendationMean'] if 'recommendationMean' in ticker_info.keys() else None
+        
+        recommendations = {
+            'overallRisk': overallRisk,
+            'recommendationKey': recommendationKey,
+            'recommendationMean': recommendationMean
+        }
+        
+        output = {'recommendations': recommendations}
+        
+        return output
+        
+    def get_technical_analysis_indicators(ticker):
+        
+        print("Getting technical indicators for: ", ticker)
+                
+        previous_twohundred_days_indicators = pd.DataFrame(YFinanceResponse.get_chart_response(ticker=ticker, period='200d', interval='1d')['chartResponse']['indicators'])
+        print(previous_twohundred_days_indicators)
 
+        closes= np.array(previous_twohundred_days_indicators['Close'])
+        highs= np.array(previous_twohundred_days_indicators['High'])
+        lows= np.array(previous_twohundred_days_indicators['Low'])
+        volumes= np.array(previous_twohundred_days_indicators['Volume']).astype(float)
+                
+        ten_day_sma_close = DeriveTechnicalIndicator.simple_moving_average(arr=closes[190:200])
+        fifty_day_sma_close = DeriveTechnicalIndicator.simple_moving_average(arr=closes[150:200])
+        twohundred_day_sma_close = DeriveTechnicalIndicator.simple_moving_average(arr=closes)
+        ten_day_wma_close = DeriveTechnicalIndicator.weighted_moving_average(arr=closes[190:200])
+        ten_day_ema_close = DeriveTechnicalIndicator.exponential_moving_average(arr=closes[190:200])
+        rsi = DeriveTechnicalIndicator.relative_strength_index(arr=closes)
+        cci = DeriveTechnicalIndicator.commodity_channel_index(
+            closes=closes[180:200],
+            highs=highs[180:200],
+            lows=lows[180:200]
+        )
+        ad = DeriveTechnicalIndicator.accumulation_distribution(
+            highs=highs,
+            lows=lows,
+            closes=closes,
+            volumes=volumes
+        )
+        print(ad)
+        
+        slow_sto_k, slow_sto_d = DeriveTechnicalIndicator.slow_stochastic(
+            highs=highs,
+            lows=lows,
+            closes=closes
+        )
+        macd = DeriveTechnicalIndicator.moving_average_convergence_divergence(closes=closes)
+        bbands = DeriveTechnicalIndicator.bolinger_bands(close_arr=closes)
+        
+        technical_indicators = {
+            ticker: {
+                'ten_day_sma_close': ten_day_sma_close,
+                'fifty_day_sma_close': fifty_day_sma_close,
+                'twohundred_day_sma_close': twohundred_day_sma_close,
+                'wma_close': ten_day_wma_close,
+                'ema_close': ten_day_ema_close,
+                'rsi': rsi,
+                'cci': cci,
+                'ad': ad,
+                'sto_k': slow_sto_k,
+                'sto_d': slow_sto_d,
+                'macd': macd,
+                'bbands': bbands
+            }
+        }
+        
+        print(technical_indicators)
+        return technical_indicators
+    
 
+class CacheData:
+    def cacheTicker(symbol):
+        ticker_from_database = QueryDatabase.queryTicker(symbol)
+        if len(ticker_from_database)==0:
+            new_ticker = YFinanceResponse.get_ticker(symbol)
+            # Add ticker to database
 
+        # return ticker from database
+        print("Ticker has been cached!")
 
+    def cacheQuote(symbol):
+        quote_from_database = QueryDatabase.queryQuote(symbol)
+        if len(quote_from_database)==0:
+            new_quote = YFinanceResponse.get_ticker(symbol, int(time.time))
+            # Add quote to database
 
+        # return quote from database
+        return "Quote has been cached!"
+
+    def cacheChartMeta(symbol):
+        chart_meta_from_database = QueryDatabase.queryChartMeta(symbol)
+        if len(chart_meta_from_database)==0:
+            new_chart_meta = YFinanceResponse.get_ticker(symbol, int(time.time))
+            # Add chart_meta to database
+
+        # return chart_meta from database
+        return "Chart Meta has been cached!"
+
+    def cacheHistoricIndicator(symbol, date):
+        historic_indicator_from_database = QueryDatabase.queryHistoricIndicator(symbol, date)
+        if len(historic_indicator_from_database)==0:
+            new_historic_indicator = YFinanceResponse.get_historic_indicator(symbol, date)
+            # Add historic_indicator to database
+
+        # return historic_indicator from database
+        return "Historic Indicator has been cached!"
+
+class QueryDatabase:
+    def queryTicker(symbol):
+        print("Checking if ticker exists in database you mother fucking bozo!")
+        ticker_from_database = PastStockMetric.objects.filter(
+            Q(stock_symbol=f'{symbol}')
+        ).values()
+        return ticker_from_database
+    
+    def queryQuote(symbol, currentTime):
+        # should update at most once per minute per stock
+        return "Checking if quote exists in database you mother fucking bozo!"
+
+    def queryChartMeta(symbol, currentTime):
+        # should update at most once per day
+        return "Checking if ticker exists in database you mother fucking bozo!"
+
+    def queryHistoricIndicator(symbol, date):
+        # should update at most once per day
+        return "Checking if historic indicator exists in database you mother fucking bozo!"
+
+class DeriveTechnicalIndicator:
+    
+    def simple_moving_average(arr):
+        output = np.average(arr)
+        return output
+    
+    def weighted_moving_average(arr):
+        wma = talib.WMA(arr, len(arr))
+        output=wma[len(wma)-1]
+        return output
+    
+    def exponential_moving_average(arr):
+        ema = talib.EMA(np.array(arr), timeperiod=len(arr))
+        output = ema[len(ema)-1]
+        return output
+    
+    def relative_strength_index(arr):
+        rsi = talib.RSI(arr, len(arr))
+        output = rsi[len(rsi)-1]
+        return output
+    
+    def commodity_channel_index(highs, lows, closes):
+        assert(len(highs) == len(lows) == len(closes))
+        cci = talib.CCI(high=highs, low=lows, close=closes, timeperiod=len(highs))
+        output = cci[len(cci)-1]
+        return output
+    
+    def accumulation_distribution(highs, lows, closes, volumes):
+        ad = talib.AD(high=highs, low=lows, close=closes, volume=volumes)
+        output = ad[len(ad)-1]
+        return output
+    
+    def fast_stochastic(closes, lows, highs):
+        fast_k, fast_d = talib.STOCHF(high=highs, low=lows, close=closes)
+        output = {"fast_k": fast_k[len(fast_k)-1], "fast_d": fast_d[len(fast_d)-1]}
+        return output
+    
+    def slow_stochastic(closes, lows, highs):
+        slow_k, slow_d = talib.STOCH(high=highs, low=lows, close=closes)
+        slow_k = slow_k[len(slow_k)-1]
+        slow_d = slow_d[len(slow_d)-1]
+        return slow_k, slow_d
+    
+    def moving_average_convergence_divergence(closes):
+        macd, macdsignal, macdhist = talib.MACDFIX(closes)
+        output = macd[len(macd)-1]
+        print(output)
+        return output
+    
+    def bolinger_bands(close_arr):
+        upperband, middleband, lowerband = talib.BBANDS(close_arr)
+        return middleband[len(middleband)-1]
+    
+    
 ##### Below functions will be removed in near future. Above class methods are more reliable, well formatted, and useable. 
-
-
-
-
-
-
-def test(input):
-    print(input)
-    return "test call lstm with input: " + input
 
 # Collects last 7 years of data from Yahoo Finance API
 # Input: string representing stock symbol
@@ -480,150 +575,3 @@ def convert_db_queryset_to_json(queryset, stockSymbol):
 
     return new_json
 
-###################        Simplified for Swift GUI         #####################
-def gather_stock_data_no_cache(stockSymbol, startDate = None, endDate = None):
-    print("Querying yfinance you motherfucking motherfucker!")
-    yf.pdr_override()
-    today = datetime.today()
-    end_date = today.strftime('%Y-%m-%d') if endDate is None else endDate
-    start_date = (today - timedelta(weeks=7*52)).strftime('%Y-%m-%d') if startDate is None else startDate
-    df = web.get_data_yahoo(
-        f'{stockSymbol}', start=f'{start_date}', end=f'{end_date}')
-    # Convert df to JSON
-    all_dates = df['Close'].keys()
-    print(all_dates)
-    elements = [
-        {
-            "date": datetime.date(date),
-            "open": float(f"{df['Open'][date]:.2f}"),
-            "close": float(f"{df['Close'][date]:.2f}"),
-            "high": float(f"{df['High'][date]:.2f}"),
-            "low": float(f"{df['Low'][date]:.2f}"),
-            "volume": int(df['Volume'][date]),
-        }
-        for i, date in enumerate(all_dates)
-    ]
-    new_json = {"stockSymbol": stockSymbol,
-                "metrics": elements}
-    return new_json
-
-def gather_stock_quote(stockSymbol):
-    print("Querying yfinance directly you motherfucking motherfucker (for quote data)!")
-    print(stockSymbol)
-    yf.pdr_override()
-    yf_response = None
-    final_output = None
-    final_output = {
-        "quoteResponse": {
-            "result": None,
-            "error": None
-        }
-    }
-    try:
-        yf_response = yf.Tickers(stockSymbol)
-        all_results = []
-        stock_symbols_array = stockSymbol.split(' ')
-        for stock in stock_symbols_array:
-            all_results.append(yf_response.tickers[stock].info)
-
-        final_output["quoteResponse"]["result"] = all_results
-
-    except KeyError as e:
-        final_output["quoteResponse"]["error"] = {
-            "description": "KeyError. There may be a typo in your stock symbol(s)."}
-        print("%s - %s at line: %s" % (sys.exc_info()
-              [0], sys.exc_info()[1], sys.exc_info()[2].tb_lineno))
-    except:
-        final_output["quoteResponse"][
-            "error"] = {
-            "description": "Unknown Error. There may be a typo in your stock symbol(s)."}
-        print("%s - %s at line: %s" % (sys.exc_info()
-              [0], sys.exc_info()[1], sys.exc_info()[2].tb_lineno))
-
-    return final_output
-
-
-def direct_fetch_from_yfinance_historic(stockSymbol):
-    print("Querying yfinance you motherfucking motherfucker!")
-    yf.pdr_override()
-    today = datetime.today()
-    end_date = today.strftime('%Y-%m-%d')
-    start_date = (today - timedelta(weeks=7*52)).strftime('%Y-%m-%d')
-    df = web.get_data_yahoo(
-        f'{stockSymbol}', start=f'{start_date}', end=f'{end_date}')
-
-    print(df)
-    # Convert df to JSON
-    json_output = json.loads(df.to_json(orient='records'))
-
-    return json_output
-
-
-def gather_stock_indicators_over_period(stockSymbol, period = None):
-    print("Querying yfinance directly you motherfucking motherfucker!")
-    print(stockSymbol)
-
-    time_range = period if period is not None else '1mo' 
-
-    yf.pdr_override()
-    yf_response = None
-    final_output = None
-
-    final_output = {
-            "result": None,
-            "error": None
-    }
-
-    try:
-        yf_response = yf.Tickers(stockSymbol)
-        all_results = []
-        stock_symbols_array = stockSymbol.split(' ')
-        for stock in stock_symbols_array:
-            all_results.append(json.loads(yf_response.tickers[stock].history(
-                period=time_range, interval="1m").to_json(orient="records")))
-
-        #### JSON IS MALFORMED WITHOUT DATETIMES. CONSIDER FORMATTING WITH EXAMPLE PRINTED BELOW
-        print(yf_response.tickers["MSFT"].history(
-                period=time_range, interval="1m"))
-
-        final_results = []
-        for i, res in enumerate(all_results):
-            final_results.append({stock_symbols_array[i]: res})
-
-        final_output["result"] = final_results
-
-    except KeyError as e:
-        final_output["error"] = {
-            "description": "KeyError. There may be a typo in your stock symbol(s)."}
-        print("%s - %s at line: %s" % (sys.exc_info()
-              [0], sys.exc_info()[1], sys.exc_info()[2].tb_lineno))
-    except:
-        final_output[
-            "error"] = {
-            "description": "Unknown Error. There may be a typo in your stock symbol(s)."}
-        print("%s - %s at line: %s" % (sys.exc_info()
-              [0], sys.exc_info()[1], sys.exc_info()[2].tb_lineno))
-
-    return final_output
-
-
-
-###     ###     TECHNICAL INDICATORS FUNCTIONS     ###     ###
-
-
-def gather_stock_technical_indicators(stock_symbol):
-    # need_to_fetch = check_if_stock_exists_in_db(input)
-    # print("Need to calculate indicators from scratch? ", need_to_fetch)
-    # df = None
-    # if not need_to_fetch:
-    #     df = fetch_from_database(input)
-    # else:
-    #     df = fetch_from_yfinance(input)
-    #     metrics = df["metrics"]
-    #     cache_stock_data(metrics, input)
-
-    # print(df["metrics"][0])
-
-    # return df
-
-    return None

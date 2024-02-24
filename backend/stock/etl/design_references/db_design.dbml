@@ -1,0 +1,151 @@
+// Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+
+Table user {
+  user_id integer [primary key]
+  created_at timestamp
+}
+
+Table playlist {
+  playlist_id integer [primary key]
+  created_at timestamp 
+  updated_at timestamp
+  user_id integer
+}
+
+Table quote {
+    quote_id integer [primary key]
+    created_at timestamp 
+    updated_at timestamp
+    symbol varchar
+    currency varchar
+    fullExchangeName varchar
+    displayName varchar
+    regularMarketPrice decimal
+    regularMarketChange decimal
+    regularMarketChangePercent decimal 
+    regularMarketChangePreviousClose decimal
+    regularMarketPreviousClose decimal
+    regularMarketTime timestamp
+    regularMarketOpen decimal
+    regularMarketDayHigh decimal
+    regularMarketDayLow decimal
+    regularMarketVolume integer
+    trailingPE decimal
+    marketCap decimal
+    fiftyTwoWeekLow decimal
+    fiftyTwoWeekHigh decimal
+    averageVolume integer
+    trailingAnnualDividendYield decimal
+    trailingEps decimal
+    beta decimal
+    yield_var decimal
+    playlist_id integer
+}
+
+Table ticker {
+    ticker_id integer [primary key]
+    created_at timestamp
+    symbol varchar
+    quoteType varchar
+    shortName varchar
+    longName varchar
+    sector varchar
+    industry varchar
+    exchangeName varchar
+    quote_id integer
+}
+
+
+Table chart_meta {
+    chart_meta_id integer [primary key]
+    created_at timestamp 
+    currency varchar
+    symbol varchar
+    regularMarketPrice decimal
+    previousClose decimal
+    gmtOffSetMilliseconds integer
+    regularTradingPeriodStartDate timestamp
+    regularTradingPeriodEndDate timestamp
+    quote_id integer
+}
+
+// Updates on command
+Table historic_indicator {
+  historic_indicator_id integer [primary key]
+  chart_meta_id integer
+  created_at timestamp 
+  updated_at timestamp
+  day timestamp
+  open decimal
+  close decimal
+  high decimal
+  low decimal
+}
+
+Table predicted_indicator {
+  predicted_indicator_id integer [primary key]
+  chart_meta_id integer
+  created_at timestamp 
+  updated_at timestamp
+  close decimal
+}
+
+Table historic_technical_analysis_indicator {
+  historic_technical_analysis_indicator_id integer [primary key]
+  chart_meta_id integer
+  created_at timestamp 
+  updated_at timestamp
+  symbol varchar
+  day timestamp
+  ten_day_sma_close decimal
+  fifty_day_sma_close decimal
+  twohundred_day_sma_close decimal
+  wma_close decimal
+  ema_close decimal
+  rsi decimal
+  cci decimal
+  ad decimal
+  sto_k decimal
+  sto_d decimal
+  macd decimal
+}
+
+Table friend {
+  friend_user_id integer [primary key]
+  user_id integer
+  created_at timestamp 
+}
+
+
+// One user to
+//    many playists
+//    many friends
+//    
+Ref: user.user_id < playlist.user_id
+Ref: user.user_id < friend.user_id
+
+// One playlist to
+//    many quotes
+//    
+Ref: playlist.playlist_id < quote.playlist_id
+
+// One quote to
+//    one ticker
+//    many charts
+//
+Ref: quote.quote_id - ticker.quote_id
+Ref: quote.quote_id < chart_meta.quote_id
+
+
+
+// One chart
+//    one chart_meta
+//    many historic_indicators
+//    many predicted_indicators
+//    many historic_technical_analysis_indicators
+//
+
+Ref: chart_meta.chart_meta_id < historic_indicator.chart_meta_id
+Ref: chart_meta.chart_meta_id < predicted_indicator.chart_meta_id
+Ref: chart_meta.chart_meta_id < historic_technical_analysis_indicator.chart_meta_id
